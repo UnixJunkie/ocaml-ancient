@@ -1,5 +1,7 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.1 2006-09-27 12:07:07 rich Exp $
+# $Id: Makefile,v 1.2 2006-09-27 12:09:02 rich Exp $
+
+include Makefile.config
 
 CC	:= gcc
 CFLAGS	:= -g -fPIC -Wall -Werror
