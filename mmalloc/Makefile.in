@@ -54,7 +54,7 @@ INSTALL_DATA =	@INSTALL_DATA@
 
 AR =		@AR@
 AR_FLAGS =	qv
-CFLAGS =	-g
+CFLAGS =	-g -fPIC
 MAKEINFO =	makeinfo
 RANLIB =	@RANLIB@
 RM =		rm

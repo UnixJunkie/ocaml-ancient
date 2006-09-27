@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.2 2006-09-27 14:05:07 rich Exp $
+ * $Id: ancient_c.c,v 1.3 2006-09-27 15:36:18 rich Exp $
  */
 
 #include <string.h>
@@ -10,6 +10,8 @@
 #include <caml/alloc.h>
 #include <caml/mlvalues.h>
 #include <caml/fail.h>
+
+#include "mmalloc/mmalloc.h"
 
 // From byterun/misc.h:
 typedef char * addr;
@@ -45,6 +47,11 @@ typedef struct area {
   void *ptr;			// Start of area.
   size_t n;			// Current position.
   size_t size;			// Allocated size.
+
+  // If this area requires custom realloc function, these will be non-null.
+  void *(*realloc)(void *data, void *ptr, size_t size);
+  void (*free)(void *data, void *ptr);
+  void *data;
 } area;
 
 static inline void
@@ -53,6 +60,21 @@ area_init (area *a)
   a->ptr = 0;
   a->n =
   a->size = 0;
+  a->realloc = 0;
+  a->free = 0;
+  a->data = 0;
+}
+
+static inline void
+area_init_custom (area *a,
+		  void *(*realloc)(void *data, void *ptr, size_t size),
+		  void (*free)(void *data, void *ptr),
+		  void *data)
+{
+  area_init (a);
+  a->realloc = realloc;
+  a->free = free;
+  a->data = data;
 }
 
 static inline int
@@ -60,7 +82,10 @@ area_append (area *a, const void *obj, size_t size)
 {
   while (a->n + size > a->size) {
     if (a->size == 0) a->size = 256; else a->size <<= 1;
-    a->ptr = realloc (a->ptr, a->size);
+    a->ptr =
+      a->realloc
+      ? a->realloc (a->data, a->ptr, a->size)
+      : realloc (a->ptr, a->size);
     if (a->ptr == 0) return -1; // Out of memory.
   }
   memcpy (a->ptr + a->n, obj, size);
@@ -73,7 +98,10 @@ area_shrink (area *a)
 {
   if (a->n != a->size) {
     a->size = a->n;
-    a->ptr = realloc (a->ptr, a->size);
+    a->ptr =
+      a->realloc
+      ? a->realloc (a->data, a->ptr, a->size)
+      : realloc (a->ptr, a->size);
     assert (a->ptr); // Getting smaller, so shouldn't really fail.
   }
 }
@@ -81,7 +109,8 @@ area_shrink (area *a)
 static inline void
 area_free (area *a)
 {
-  free (a->ptr);
+  if (a->free) a->free (a->data, a->ptr);
+  else free (a->ptr);
   a->n =
   a->size = 0;
 }
@@ -120,9 +149,8 @@ mark (value obj, area *ptr, area *restore, area *fixups)
   char *header = Hp_val (obj);
   assert (Wosize_hp (header) > 0); // Always true? (XXX)
 
-  // We can't handle out-of-heap objects.
-  // XXX Since someone might try to mark an ancient object, they
-  // might get this error, so we should try to do better here.
+  // XXX This assertion might fail if someone tries to mark an object
+  // which is already ancient.
   assert (Is_young (obj) || Is_in_heap (obj));
 
   // If we've already visited this object, just return its offset
@@ -231,14 +259,17 @@ do_fixups (area *ptr, area *fixups)
     }
 }
 
-CAMLprim value
-ancient_mark (value obj)
+static CAMLprim value
+do_mark (value obj,
+	 void *(*realloc)(void *data, void *ptr, size_t size),
+	 void (*free)(void *data, void *ptr),
+	 void *data)
 {
   CAMLparam1 (obj);
   CAMLlocal1 (proxy);
 
   area ptr; // This will be the out of heap area.
-  area_init (&ptr);
+  area_init_custom (&ptr, realloc, free, data);
   area restore; // Headers to be fixed up after.
   area_init (&restore);
   area fixups; // List of fake pointers to be fixed up.
@@ -246,8 +277,8 @@ ancient_mark (value obj)
 
   if (mark (obj, &ptr, &restore, &fixups) == -1) {
     // Ran out of memory.  Recover and throw an exception.
-    do_restore (&ptr, &restore);
     area_free (&fixups);
+    do_restore (&ptr, &restore);
     area_free (&restore);
     area_free (&ptr);
     caml_failwith ("out of memory");
@@ -266,6 +297,29 @@ ancient_mark (value obj)
   // Replace obj with a proxy.
   proxy = caml_alloc (1, Abstract_tag);
   Field (proxy, 0) = (value) ptr.ptr;
+
+  CAMLreturn (proxy);
+}
+
+static void *
+my_realloc (void *data __attribute__((unused)), void *ptr, size_t size)
+{
+  return realloc (ptr, size);
+}
+
+static void
+my_free (void *data __attribute__((unused)), void *ptr)
+{
+  return free (ptr);
+}
+
+CAMLprim value
+ancient_mark (value obj)
+{
+  CAMLparam1 (obj);
+  CAMLlocal1 (proxy);
+
+  proxy = do_mark (obj, my_realloc, my_free, 0);
 
   CAMLreturn (proxy);
 }
@@ -298,6 +352,73 @@ ancient_delete (value obj)
 
   // Replace the proxy (a pointer) with an int 0 so we know it's
   // been deleted in future.
+  Field (obj, 0) = Val_long (0);
+
+  CAMLreturn (Val_unit);
+}
+
+CAMLprim value
+ancient_share (value fdv, value obj)
+{
+  CAMLparam2 (fdv, obj);
+  CAMLlocal1 (proxy);
+
+  int fd = Int_val (fd);
+  void *md = mmalloc_attach (fd, 0);
+  if (md == 0) {
+    perror ("mmalloc_attach");
+    caml_failwith ("mmalloc_attach");
+  }
+
+  proxy = do_mark (obj, mrealloc, mfree, md);
+
+  // Save the address of the object within the mmalloc area.  We need
+  // it when attaching.
+  mmalloc_setkey (md, 0, (void *) Field (proxy, 0));
+
+  CAMLreturn (proxy);
+}
+
+CAMLprim value
+ancient_attach (value fdv)
+{
+  CAMLparam1 (fdv);
+  CAMLlocal1 (proxy);
+
+  int fd = Int_val (fd);
+  void *md = mmalloc_attach (fd, 0);
+  if (md == 0) {
+    perror ("mmalloc_attach");
+    caml_failwith ("mmalloc_attach");
+  }
+
+  proxy = caml_alloc (2, Abstract_tag);
+  Field (proxy, 0) = (value) mmalloc_getkey (md, 0);
+  Field (proxy, 1) = (value) md;
+
+  CAMLreturn (proxy);
+}
+
+CAMLprim value
+ancient_detach (value obj)
+{
+  CAMLparam1 (obj);
+  CAMLlocal1 (v);
+
+  int size = Wosize_val (obj);
+  if (size < 2) caml_failwith ("Ancient.detach: not an attached object");
+
+  v = Field (obj, 0);
+  if (Is_long (v)) caml_invalid_argument ("detached");
+
+  void *md = (void *) Field (obj, 1);
+  if (mmalloc_detach (md) != 0) {
+    perror ("mmalloc_detach");
+    caml_failwith ("mmalloc_detach");
+  }
+
+  // Replace the proxy (a pointer) with an int 0 so we know it's
+  // been detached in future.
   Field (obj, 0) = Val_long (0);
 
   CAMLreturn (Val_unit);
