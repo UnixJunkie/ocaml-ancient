@@ -1,0 +1,6 @@
+name="@PACKAGE@"
+version="@VERSION@"
+description="Mark objects as 'ancient' so they are taken out of the OCaml heap."
+requires=""
+archive(byte)="ancient.cma"
+archive(native)="ancient.cmxa"

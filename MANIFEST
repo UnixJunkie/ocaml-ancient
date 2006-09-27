@@ -6,4 +6,5 @@ ancient.mli
 Makefile
 Makefile.config
 MANIFEST
+META.in
 test_ancient.ml

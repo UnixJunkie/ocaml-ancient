@@ -1,5 +1,5 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.2 2006-09-27 12:09:02 rich Exp $
+# $Id: Makefile,v 1.3 2006-09-27 12:10:18 rich Exp $
 
 include Makefile.config
 
@@ -40,9 +40,9 @@ test_ancient.opt: ancient.cmxa test_ancient.cmx
 # Findlib META file.
 
 META:	META.in Makefile.config
-	$(SED)  -e 's/@PACKAGE@/$(PACKAGE)/' \
-		-e 's/@VERSION@/$(VERSION)/' \
-		< $< > $@
+	sed  -e 's/@PACKAGE@/$(PACKAGE)/' \
+	     -e 's/@VERSION@/$(VERSION)/' \
+	     < $< > $@
 
 # Clean.
 
