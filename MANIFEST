@@ -36,4 +36,5 @@ mmalloc/mvalloc.c
 mmalloc/sbrk-sup.c
 mmalloc/TODO
 test_ancient.ml
+test_ancient_shared.ml
 test_ancient_weblogs.ml

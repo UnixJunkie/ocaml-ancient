@@ -1,5 +1,5 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.5 2006-09-27 15:36:18 rich Exp $
+# $Id: Makefile,v 1.6 2006-09-27 16:01:47 rich Exp $
 
 include Makefile.config
 
@@ -24,7 +24,8 @@ OCAMLOPTPACKAGES  := $(OCAMLCPACKAGES)
 OCAMLOPTLIBS	:= -linkpkg weblogs.cmxa
 endif
 
-TARGETS		:= mmalloc ancient.cma ancient.cmxa META test_ancient.opt
+TARGETS		:= mmalloc ancient.cma ancient.cmxa META \
+		   test_ancient.opt test_ancient_shared.opt
 
 ifeq ($(TEST_WEBLOGS),1)
 TARGETS		+= test_ancient_weblogs.opt
@@ -39,6 +40,10 @@ ancient.cmxa: ancient.cmx ancient_c.o
 	ocamlmklib -o ancient -Lmmalloc -lmmalloc $^
 
 test_ancient.opt: ancient.cmxa test_ancient.cmx
+	LIBRARY_PATH=.:$$LIBRARY_PATH \
+	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
+
+test_ancient_shared.opt: ancient.cmxa test_ancient_shared.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
 

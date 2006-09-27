@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.3 2006-09-27 15:36:18 rich Exp $
+ * $Id: ancient_c.c,v 1.4 2006-09-27 16:01:47 rich Exp $
  */
 
 #include <string.h>
@@ -259,15 +259,12 @@ do_fixups (area *ptr, area *fixups)
     }
 }
 
-static CAMLprim value
+static void *
 do_mark (value obj,
 	 void *(*realloc)(void *data, void *ptr, size_t size),
 	 void (*free)(void *data, void *ptr),
 	 void *data)
 {
-  CAMLparam1 (obj);
-  CAMLlocal1 (proxy);
-
   area ptr; // This will be the out of heap area.
   area_init_custom (&ptr, realloc, free, data);
   area restore; // Headers to be fixed up after.
@@ -294,11 +291,7 @@ do_mark (value obj,
   do_fixups (&ptr, &fixups);
   area_free (&fixups);
 
-  // Replace obj with a proxy.
-  proxy = caml_alloc (1, Abstract_tag);
-  Field (proxy, 0) = (value) ptr.ptr;
-
-  CAMLreturn (proxy);
+  return ptr.ptr;
 }
 
 static void *
@@ -319,7 +312,11 @@ ancient_mark (value obj)
   CAMLparam1 (obj);
   CAMLlocal1 (proxy);
 
-  proxy = do_mark (obj, my_realloc, my_free, 0);
+  void *ptr = do_mark (obj, my_realloc, my_free, 0);
+
+  // Replace obj with a proxy.
+  proxy = caml_alloc (1, Abstract_tag);
+  Field (proxy, 0) = (value) ptr;
 
   CAMLreturn (proxy);
 }
@@ -363,18 +360,22 @@ ancient_share (value fdv, value obj)
   CAMLparam2 (fdv, obj);
   CAMLlocal1 (proxy);
 
-  int fd = Int_val (fd);
+  int fd = Int_val (fdv);
   void *md = mmalloc_attach (fd, 0);
   if (md == 0) {
     perror ("mmalloc_attach");
     caml_failwith ("mmalloc_attach");
   }
 
-  proxy = do_mark (obj, mrealloc, mfree, md);
+  void *ptr = do_mark (obj, mrealloc, mfree, md);
 
   // Save the address of the object within the mmalloc area.  We need
   // it when attaching.
-  mmalloc_setkey (md, 0, (void *) Field (proxy, 0));
+  mmalloc_setkey (md, 0, ptr);
+
+  proxy = caml_alloc (2, Abstract_tag);
+  Field (proxy, 0) = (value) ptr;
+  Field (proxy, 1) = (value) md;
 
   CAMLreturn (proxy);
 }
@@ -385,7 +386,7 @@ ancient_attach (value fdv)
   CAMLparam1 (fdv);
   CAMLlocal1 (proxy);
 
-  int fd = Int_val (fd);
+  int fd = Int_val (fdv);
   void *md = mmalloc_attach (fd, 0);
   if (md == 0) {
     perror ("mmalloc_attach");
@@ -405,7 +406,7 @@ ancient_detach (value obj)
   CAMLparam1 (obj);
   CAMLlocal1 (v);
 
-  int size = Wosize_val (obj);
+  mlsize_t size = Wosize_val (obj);
   if (size < 2) caml_failwith ("Ancient.detach: not an attached object");
 
   v = Field (obj, 0);
