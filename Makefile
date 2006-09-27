@@ -1,5 +1,5 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.3 2006-09-27 12:10:18 rich Exp $
+# $Id: Makefile,v 1.4 2006-09-27 14:05:07 rich Exp $
 
 include Makefile.config
 
@@ -16,7 +16,21 @@ OCAMLOPTLIBS	:=
 
 OCAMLDOCFLAGS := -html -stars -sort $(OCAMLCPACKAGES)
 
-all:	ancient.cma ancient.cmxa test_ancient.opt META
+ifeq ($(TEST_WEBLOGS),1)
+# For testing with large amount of weblogs data.
+OCAMLCPACKAGES	:= -package calendar,pcre,extlib -I ../../freeware/weblogs
+OCAMLCLIBS	:= -linkpkg weblogs.cma
+OCAMLOPTPACKAGES  := $(OCAMLCPACKAGES)
+OCAMLOPTLIBS	:= -linkpkg weblogs.cmxa
+endif
+
+TARGETS		:= ancient.cma ancient.cmxa META test_ancient.opt
+
+ifeq ($(TEST_WEBLOGS),1)
+TARGETS		+= test_ancient_weblogs.opt
+endif
+
+all:	$(TARGETS)
 
 ancient.cma: ancient.cmo ancient_c.o
 	ocamlmklib -o ancient $^
@@ -26,7 +40,13 @@ ancient.cmxa: ancient.cmx ancient_c.o
 
 test_ancient.opt: ancient.cmxa test_ancient.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
-	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTLIBS) -o $@ $^
+	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
+
+ifeq ($(TEST_WEBLOGS),1)
+test_ancient_weblogs.opt: ancient.cmxa test_ancient_weblogs.cmx
+	LIBRARY_PATH=.:$$LIBRARY_PATH \
+	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
+endif
 
 # Common rules for building OCaml objects.
 

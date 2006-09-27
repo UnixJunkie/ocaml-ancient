@@ -2,3 +2,5 @@ ancient.cmo: ancient.cmi
 ancient.cmx: ancient.cmi 
 test_ancient.cmo: ancient.cmi 
 test_ancient.cmx: ancient.cmx 
+test_ancient_weblogs.cmo: ancient.cmi 
+test_ancient_weblogs.cmx: ancient.cmx 

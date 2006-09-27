@@ -8,3 +8,4 @@ Makefile.config
 MANIFEST
 META.in
 test_ancient.ml
+test_ancient_weblogs.ml

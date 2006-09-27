@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.1 2006-09-27 12:07:07 rich Exp $
+ * $Id: ancient_c.c,v 1.2 2006-09-27 14:05:07 rich Exp $
  */
 
 #include <string.h>
@@ -13,6 +13,13 @@
 
 // From byterun/misc.h:
 typedef char * addr;
+
+// From byterun/minor_gc.c:
+CAMLextern char *caml_young_start;
+CAMLextern char *caml_young_end;
+#define Is_young(val) \
+  (assert (Is_block (val)),						\
+   (addr)(val) < (addr)caml_young_end && (addr)(val) > (addr)caml_young_start)
 
 // From byterun/major_gc.h:
 #ifdef __alpha
@@ -99,12 +106,16 @@ static header_t visited = (unsigned long) -1;
 // object's header to a special 'visited' value.  However since these
 // are objects in the Caml heap we have to restore the original
 // headers at the end, which is the purpose of the [restore] area.
+// 4. We use realloc to allocate the memory for the copy, but because
+// the memory can move around, we cannot store absolute pointers.
+// Instead we store offsets and fix them up later.  This is the
+// purpose of the [fixups] area.
 //
-// XXX Recursive function will probably fall over once we apply it to
-// large, deeply recursive structures.  Should be replaced with something
-// iterative.
+// XXX Large, deeply recursive structures cause a stack overflow.
+// Temporary solution: 'ulimit -s unlimited'.  This function should
+// be replaced with something iterative.
 static size_t
-mark (value obj, area *ptr, area *restore)
+mark (value obj, area *ptr, area *restore, area *fixups)
 {
   char *header = Hp_val (obj);
   assert (Wosize_hp (header) > 0); // Always true? (XXX)
@@ -112,7 +123,7 @@ mark (value obj, area *ptr, area *restore)
   // We can't handle out-of-heap objects.
   // XXX Since someone might try to mark an ancient object, they
   // might get this error, so we should try to do better here.
-  assert (Is_in_heap (obj));
+  assert (Is_young (obj) || Is_in_heap (obj));
 
   // If we've already visited this object, just return its offset
   // in the out-of-heap memory.
@@ -136,8 +147,9 @@ mark (value obj, area *ptr, area *restore)
     for (i = 0; i < nr_words; ++i) {
       value field = Field (obj, i);
 
-      if (Is_block (field)) {
-	size_t field_offset = mark (field, ptr, restore);
+      if (Is_block (field) &&
+	  (Is_young (field) || Is_in_heap (field))) {
+	size_t field_offset = mark (field, ptr, restore, fixups);
 	if (field_offset == -1) return -1; // Propagate out of memory errors.
 
 	// Since the recursive call to mark above can reallocate the
@@ -148,7 +160,10 @@ mark (value obj, area *ptr, area *restore)
 	// Don't store absolute pointers yet because realloc will
 	// move the memory around.  Store a fake pointer instead.
 	// We'll fix up these fake pointers afterwards.
-	Field (obj_copy, i) = (field_offset + sizeof (header_t)) << 2;
+	Field (obj_copy, i) = field_offset + sizeof (header_t);
+
+	size_t fixup = (void *)&Field(obj_copy, i) - ptr->ptr;
+	area_append (fixups, &fixup, sizeof fixup);
       }
     }
   }
@@ -201,6 +216,21 @@ do_restore (area *ptr, area *restore)
     }
 }
 
+// Fixup fake pointers.
+static void
+do_fixups (area *ptr, area *fixups)
+{
+  long i;
+
+  for (i = 0; i < fixups->n; i += sizeof (size_t))
+    {
+      size_t fixup = *(size_t *)(fixups->ptr + i);
+      size_t offset = *(size_t *)(ptr->ptr + fixup);
+      void *real_ptr = ptr->ptr + offset;
+      *(value *)(ptr->ptr + fixup) = (value) real_ptr;
+    }
+}
+
 CAMLprim value
 ancient_mark (value obj)
 {
@@ -211,10 +241,13 @@ ancient_mark (value obj)
   area_init (&ptr);
   area restore; // Headers to be fixed up after.
   area_init (&restore);
+  area fixups; // List of fake pointers to be fixed up.
+  area_init (&fixups);
 
-  if (mark (obj, &ptr, &restore) == -1) {
+  if (mark (obj, &ptr, &restore, &fixups) == -1) {
     // Ran out of memory.  Recover and throw an exception.
     do_restore (&ptr, &restore);
+    area_free (&fixups);
     area_free (&restore);
     area_free (&ptr);
     caml_failwith ("out of memory");
@@ -227,33 +260,8 @@ ancient_mark (value obj)
 
   // Update all fake pointers in the out of heap area to make them real
   // pointers.
-  size_t i;
-  for (i = 0; i < ptr.n; )
-    {
-      // Out of heap area is: header, fields, header, fields, ...
-      // The header of each object tells us how many fields it has.
-      char *header = ptr.ptr + i;
-      size_t bytes = Bhsize_hp (header);
-      value obj = Val_hp (header);
-
-      int can_scan = Tag_val (obj) < No_scan_tag;
-      if (can_scan) {
-	mlsize_t nr_words = Wosize_hp (header);
-	mlsize_t j;
-
-	for (j = 0; j < nr_words; ++j) {
-	  value field = Field (obj, j);
-
-	  if (Is_block (field)) {
-	    size_t field_offset = field >> 2;
-	    void *field_ptr = ptr.ptr + field_offset;
-	    Field (obj, j) = (value) field_ptr;
-	  }
-	}
-      }
-
-      i += bytes; // Skip to next object.
-    }
+  do_fixups (&ptr, &fixups);
+  area_free (&fixups);
 
   // Replace obj with a proxy.
   proxy = caml_alloc (1, Abstract_tag);
@@ -285,7 +293,7 @@ ancient_delete (value obj)
   if (Is_long (v)) caml_invalid_argument ("deleted");
 
   // Otherwise v is a pointer to the out of heap malloc'd object.
-  assert (!Is_in_heap (v));
+  assert (!Is_young (v) && !Is_in_heap (v));
   free ((void *) v);
 
   // Replace the proxy (a pointer) with an int 0 so we know it's
