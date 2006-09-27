@@ -1,0 +1,4 @@
+ancient.cmo: ancient.cmi 
+ancient.cmx: ancient.cmi 
+test_ancient.cmo: ancient.cmi 
+test_ancient.cmx: ancient.cmx 
