@@ -1,5 +1,5 @@
 (* Load in large weblogs and see if they can still be used.
- * $Id: test_ancient_weblogs.ml,v 1.1 2006-09-27 14:05:07 rich Exp $
+ * $Id: test_ancient_weblogs.ml,v 1.2 2006-09-27 18:39:44 rich Exp $
  *)
 
 open Printf
@@ -71,18 +71,25 @@ let files =
 
   files
 
+let md =
+  let fd =
+    Unix.openfile "test_ancient_weblogs.data"
+      [Unix.O_RDWR; Unix.O_CREAT; Unix.O_TRUNC] 0o644 in
+  Ancient.attach fd
+
 (* Load each file into memory and make it ancient. *)
 let () =
-  let files =
-    List.map (
-      fun filename ->
-	eprintf "Importing file %s\n%!" filename;
-	let rows =
-	  let rows = Weblogs.import_file filename in
-	  Ancient.mark rows in
-	gc_compact ();
-	rows
-    ) files in
+  List.iteri (
+    fun key filename ->
+      let () =
+	let basename = Filename.basename filename in
+	eprintf "Importing logfile %s\n%!" basename;
+	let rows = Weblogs.import_file filename in
+	ignore (Ancient.share md key rows) in
+      gc_compact ()
+  ) files;
 
-  ignore (files)
 
+
+
+  Ancient.detach md

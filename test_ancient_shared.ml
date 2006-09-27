@@ -1,5 +1,5 @@
 (* Very basic tests of Ancient module shared functionality.
- * $Id: test_ancient_shared.ml,v 1.1 2006-09-27 16:01:47 rich Exp $
+ * $Id: test_ancient_shared.ml,v 1.2 2006-09-27 18:39:44 rich Exp $
  *)
 
 open Printf
@@ -70,16 +70,20 @@ let () =
   | ["read"; share_filename; print_filename] ->
       (* Read data in filename and print. *)
       let fd = Unix.openfile share_filename [Unix.O_RDWR] 0 in
-      let data : item array Ancient.ancient = Ancient.attach fd in
+      let md = Ancient.attach fd in
 
       eprintf "After attaching %s ...\n" share_filename;
+      gc_compact ();
+
+      let data : item array Ancient.ancient = Ancient.get md 0 in
+      eprintf "After getting ...\n";
       gc_compact ();
 
       let chan = open_out print_filename in
       output_data chan (Ancient.follow data);
       close_out chan;
 
-      Ancient.detach data;
+      Ancient.detach md;
       eprintf "After detaching ...\n";
       gc_compact ()
 
@@ -107,12 +111,13 @@ let () =
       let fd =
 	Unix.openfile share_filename
 	  [Unix.O_CREAT;Unix.O_TRUNC;Unix.O_RDWR] 0o644 in
+      let md = Ancient.attach fd in
 
-      let data = Ancient.share fd data in
+      ignore (Ancient.share md 0 data);
       eprintf "After sharing data to %s ...\n" share_filename;
       gc_compact ();
 
-      Ancient.detach data;
+      Ancient.detach md;
       eprintf "After detaching ...\n";
       gc_compact ()
 

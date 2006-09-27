@@ -11,3 +11,4 @@ ancient-*.tar.gz
 test_ancient_shared.data
 test_ancient_shared.out1
 test_ancient_shared.out2
+test_ancient_weblogs.data

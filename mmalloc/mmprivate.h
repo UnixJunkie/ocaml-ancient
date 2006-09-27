@@ -43,7 +43,7 @@ Boston, MA 02111-1307, USA.
 #define MMALLOC_MAGIC		"mmalloc"	/* Mapped file magic number */
 #define MMALLOC_MAGIC_SIZE	8		/* Size of magic number buf */
 #define MMALLOC_VERSION		1		/* Current mmalloc version */
-#define MMALLOC_KEYS		16		/* Keys for application use */
+#define MMALLOC_KEYS		1024		/* Keys for application use */
 
 /* The allocator divides the heap into blocks of fixed size; large
    requests receive one or more whole blocks, and small requests

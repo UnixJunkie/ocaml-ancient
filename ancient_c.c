@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.4 2006-09-27 16:01:47 rich Exp $
+ * $Id: ancient_c.c,v 1.5 2006-09-27 18:39:44 rich Exp $
  */
 
 #include <string.h>
@@ -314,7 +314,7 @@ ancient_mark (value obj)
 
   void *ptr = do_mark (obj, my_realloc, my_free, 0);
 
-  // Replace obj with a proxy.
+  // Return the proxy.
   proxy = caml_alloc (1, Abstract_tag);
   Field (proxy, 0) = (value) ptr;
 
@@ -355,36 +355,10 @@ ancient_delete (value obj)
 }
 
 CAMLprim value
-ancient_share (value fdv, value obj)
-{
-  CAMLparam2 (fdv, obj);
-  CAMLlocal1 (proxy);
-
-  int fd = Int_val (fdv);
-  void *md = mmalloc_attach (fd, 0);
-  if (md == 0) {
-    perror ("mmalloc_attach");
-    caml_failwith ("mmalloc_attach");
-  }
-
-  void *ptr = do_mark (obj, mrealloc, mfree, md);
-
-  // Save the address of the object within the mmalloc area.  We need
-  // it when attaching.
-  mmalloc_setkey (md, 0, ptr);
-
-  proxy = caml_alloc (2, Abstract_tag);
-  Field (proxy, 0) = (value) ptr;
-  Field (proxy, 1) = (value) md;
-
-  CAMLreturn (proxy);
-}
-
-CAMLprim value
 ancient_attach (value fdv)
 {
   CAMLparam1 (fdv);
-  CAMLlocal1 (proxy);
+  CAMLlocal1 (mdv);
 
   int fd = Int_val (fdv);
   void *md = mmalloc_attach (fd, 0);
@@ -393,34 +367,67 @@ ancient_attach (value fdv)
     caml_failwith ("mmalloc_attach");
   }
 
-  proxy = caml_alloc (2, Abstract_tag);
-  Field (proxy, 0) = (value) mmalloc_getkey (md, 0);
-  Field (proxy, 1) = (value) md;
+  mdv = caml_alloc (1, Abstract_tag);
+  Field (mdv, 0) = (value) md;
 
-  CAMLreturn (proxy);
+  CAMLreturn (mdv);
 }
 
 CAMLprim value
-ancient_detach (value obj)
+ancient_detach (value mdv)
 {
-  CAMLparam1 (obj);
-  CAMLlocal1 (v);
+  CAMLparam1 (mdv);
 
-  mlsize_t size = Wosize_val (obj);
-  if (size < 2) caml_failwith ("Ancient.detach: not an attached object");
+  void *md = (void *) Field (mdv, 0);
 
-  v = Field (obj, 0);
-  if (Is_long (v)) caml_invalid_argument ("detached");
-
-  void *md = (void *) Field (obj, 1);
   if (mmalloc_detach (md) != 0) {
     perror ("mmalloc_detach");
     caml_failwith ("mmalloc_detach");
   }
 
-  // Replace the proxy (a pointer) with an int 0 so we know it's
-  // been detached in future.
-  Field (obj, 0) = Val_long (0);
-
   CAMLreturn (Val_unit);
+}
+
+CAMLprim value
+ancient_share (value mdv, value keyv, value obj)
+{
+  CAMLparam3 (mdv, keyv, obj);
+  CAMLlocal1 (proxy);
+
+  void *md = (void *) Field (mdv, 0);
+  int key = Int_val (keyv);
+
+  // Existing key exists?  Free it.
+  void *old_obj = mmalloc_getkey (md, key);
+  if (old_obj != 0) mfree (md, old_obj);
+  mmalloc_setkey (md, key, 0);
+
+  void *ptr = do_mark (obj, mrealloc, mfree, md);
+
+  mmalloc_setkey (md, key, ptr);
+
+  // Return the proxy.
+  proxy = caml_alloc (1, Abstract_tag);
+  Field (proxy, 0) = (value) ptr;
+
+  CAMLreturn (proxy);
+}
+
+CAMLprim value
+ancient_get (value mdv, value keyv)
+{
+  CAMLparam2 (mdv, keyv);
+  CAMLlocal1 (proxy);
+
+  void *md = (void *) Field (mdv, 0);
+  int key = Int_val (keyv);
+
+  void *ptr = mmalloc_getkey (md, key);
+  if (!ptr) caml_raise_not_found ();
+
+  // Return the proxy.
+  proxy = caml_alloc (1, Abstract_tag);
+  Field (proxy, 0) = (value) ptr;
+
+  CAMLreturn (proxy);
 }
