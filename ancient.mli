@@ -1,5 +1,5 @@
 (** Mark objects as 'ancient' so they are taken out of the OCaml heap.
-  * $Id: ancient.mli,v 1.3 2006-09-27 18:39:44 rich Exp $
+  * $Id: ancient.mli,v 1.4 2006-09-28 12:40:07 rich Exp $
   *)
 
 type 'a ancient
@@ -35,13 +35,28 @@ val delete : 'a ancient -> unit
 type md
   (** Memory descriptor handle. *)
 
-val attach : Unix.file_descr -> md
-  (** [attach fd] attaches to a new or existing file which may contain
-    * shared objects.
+val attach : Unix.file_descr -> nativeint -> md
+  (** [attach fd baseaddr] attaches to a new or existing file
+    * which may contain shared objects.
     *
     * Initially [fd] should be a read/writable, zero-length file
-    * (see {!Unix.openfile}).  One or more objects can then be
-    * shared in this file using {!Unix.share}.
+    * (for example you could create this using {!Unix.openfile} and
+    * passing the flags [O_RDWR], [O_TRUNC], [O_CREAT]).
+    * One or more objects can then be shared in this file
+    * using {!Unix.share}.
+    *
+    * For new files, [baseaddr] specifies the virtual address to
+    * map the file.  Specifying [Nativeint.zero] ([0n]) here lets [mmap(2)]
+    * choose this, but on some platforms (notably Linux/AMD64)
+    * [mmap] chooses very unwisely, tending to map the memory
+    * just before [libc] with hardly any headroom to grow.  If
+    * you encounter this sort of problem (usually a segfault or
+    * illegal instruction inside libc), then look at [/proc/PID/maps]
+    * and choose a more suitable address.
+    *
+    * If the file was created previously, then the [baseaddr] is
+    * ignored.  The underlying [mmalloc] library will map the
+    * file in at the same place as before.
     *)
 
 val detach : md -> unit
@@ -72,6 +87,9 @@ val share : md -> int -> 'a -> 'a ancient
     * The underlying [mmalloc] library does not do any sort of
     * locking, so all calls to [share] must ensure that they have
     * exclusive access to the underlying file while in progress.
+    * (Other processes should not even call {!Ancient.get} while
+    * this is happening, but it seems safe to be just reading an
+    * ancient object from the file).
     *)
 
 val get : md -> int -> 'a ancient
@@ -79,7 +97,8 @@ val get : md -> int -> 'a ancient
     * attached file.
     *
     * The key is in the range [0..1023] (the limit is hard-coded in
-    * [mmalloc/mmprivate.h]).
+    * [mmalloc/mmprivate.h]).  If you do not wish to use this feature,
+    * just pass [0] as the key when sharing / getting.
     *
     * You need to annotate the returned object with the correct
     * type.  As with the Marshal module, there is no type checking,

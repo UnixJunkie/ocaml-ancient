@@ -1,5 +1,5 @@
 (* Load in large weblogs and see if they can still be used.
- * $Id: test_ancient_weblogs.ml,v 1.2 2006-09-27 18:39:44 rich Exp $
+ * $Id: test_ancient_weblogs.ml,v 1.3 2006-09-28 12:40:07 rich Exp $
  *)
 
 open Printf
@@ -71,11 +71,14 @@ let files =
 
   files
 
+(* XXX Linux/AMD64-specific hack to avoid bad mmap(2) allocation. *)
+let baseaddr = Nativeint.of_string "0x440000000000"
+
 let md =
   let fd =
     Unix.openfile "test_ancient_weblogs.data"
       [Unix.O_RDWR; Unix.O_CREAT; Unix.O_TRUNC] 0o644 in
-  Ancient.attach fd
+  Ancient.attach fd baseaddr
 
 (* Load each file into memory and make it ancient. *)
 let () =

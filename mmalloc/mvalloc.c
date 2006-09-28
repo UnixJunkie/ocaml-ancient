@@ -42,9 +42,13 @@ mvalloc (md, size)
 }
 
 
+#if 0 // RWMJ
+
 PTR
 valloc (size)
   size_t size;
 {
   return mvalloc ((PTR) NULL, size);
 }
+
+#endif

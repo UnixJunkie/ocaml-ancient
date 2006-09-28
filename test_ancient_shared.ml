@@ -1,5 +1,5 @@
 (* Very basic tests of Ancient module shared functionality.
- * $Id: test_ancient_shared.ml,v 1.2 2006-09-27 18:39:44 rich Exp $
+ * $Id: test_ancient_shared.ml,v 1.3 2006-09-28 12:40:07 rich Exp $
  *)
 
 open Printf
@@ -65,12 +65,15 @@ and string_of_marital_status status =
   | Married -> "Married"
   | Divorced -> "Divorced"
 
+(* XXX Linux/AMD64-specific hack to avoid bad mmap(2) allocation. *)
+let baseaddr = Nativeint.of_string "0x440000000000"
+
 let () =
   match List.tl (Array.to_list Sys.argv) with
   | ["read"; share_filename; print_filename] ->
       (* Read data in filename and print. *)
       let fd = Unix.openfile share_filename [Unix.O_RDWR] 0 in
-      let md = Ancient.attach fd in
+      let md = Ancient.attach fd 0n in
 
       eprintf "After attaching %s ...\n" share_filename;
       gc_compact ();
@@ -111,7 +114,7 @@ let () =
       let fd =
 	Unix.openfile share_filename
 	  [Unix.O_CREAT;Unix.O_TRUNC;Unix.O_RDWR] 0o644 in
-      let md = Ancient.attach fd in
+      let md = Ancient.attach fd baseaddr in
 
       ignore (Ancient.share md 0 data);
       eprintf "After sharing data to %s ...\n" share_filename;

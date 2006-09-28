@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.5 2006-09-27 18:39:44 rich Exp $
+ * $Id: ancient_c.c,v 1.6 2006-09-28 12:40:07 rich Exp $
  */
 
 #include <string.h>
@@ -355,13 +355,14 @@ ancient_delete (value obj)
 }
 
 CAMLprim value
-ancient_attach (value fdv)
+ancient_attach (value fdv, value baseaddrv)
 {
-  CAMLparam1 (fdv);
+  CAMLparam2 (fdv, baseaddrv);
   CAMLlocal1 (mdv);
 
   int fd = Int_val (fdv);
-  void *md = mmalloc_attach (fd, 0);
+  void *baseaddr = (void *) Nativeint_val (baseaddrv);
+  void *md = mmalloc_attach (fd, baseaddr);
   if (md == 0) {
     perror ("mmalloc_attach");
     caml_failwith ("mmalloc_attach");

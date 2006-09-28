@@ -233,6 +233,8 @@ mfree (md, ptr)
     }
 }
 
+#if 0 // RWMJ
+
 /* When using this package, provide a version of malloc/realloc/free built
    on top of it, so that if we use the default sbrk() region we will not
    collide with another malloc package trying to do the same thing, if
@@ -245,3 +247,5 @@ free (ptr)
 {
   mfree ((PTR) NULL, ptr);
 }
+
+#endif
