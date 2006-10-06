@@ -1,5 +1,5 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.6 2006-09-27 16:01:47 rich Exp $
+# $Id: Makefile,v 1.7 2006-10-06 12:26:31 rich Exp $
 
 include Makefile.config
 
@@ -16,20 +16,8 @@ OCAMLOPTLIBS	:=
 
 OCAMLDOCFLAGS := -html -stars -sort $(OCAMLCPACKAGES)
 
-ifeq ($(TEST_WEBLOGS),1)
-# For testing with large amount of weblogs data.
-OCAMLCPACKAGES	:= -package calendar,pcre,extlib -I ../../freeware/weblogs
-OCAMLCLIBS	:= -linkpkg weblogs.cma
-OCAMLOPTPACKAGES  := $(OCAMLCPACKAGES)
-OCAMLOPTLIBS	:= -linkpkg weblogs.cmxa
-endif
-
 TARGETS		:= mmalloc ancient.cma ancient.cmxa META \
 		   test_ancient.opt test_ancient_shared.opt
-
-ifeq ($(TEST_WEBLOGS),1)
-TARGETS		+= test_ancient_weblogs.opt
-endif
 
 all:	$(TARGETS)
 
@@ -46,12 +34,6 @@ test_ancient.opt: ancient.cmxa test_ancient.cmx
 test_ancient_shared.opt: ancient.cmxa test_ancient_shared.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
-
-ifeq ($(TEST_WEBLOGS),1)
-test_ancient_weblogs.opt: ancient.cmxa test_ancient_weblogs.cmx
-	LIBRARY_PATH=.:$$LIBRARY_PATH \
-	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
-endif
 
 # Build the mmalloc library.
 
@@ -96,7 +78,7 @@ endif
 
 install:
 	rm -rf $(DESTDIR)$(OCAMLLIBDIR)/ancient
-	install -c -m 0755 -d $(DESTDIR)$(OCAMLLIBDIR)/weblogs
+	install -c -m 0755 -d $(DESTDIR)$(OCAMLLIBDIR)/ancient
 	install -c -m 0644 *.cmi *.mli *.cma *.cmxa *.a META \
 	  $(DESTDIR)$(OCAMLLIBDIR)/ancient
 
