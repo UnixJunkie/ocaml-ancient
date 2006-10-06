@@ -1,5 +1,5 @@
 (** Mark objects as 'ancient' so they are taken out of the OCaml heap.
-  * $Id: ancient.mli,v 1.4 2006-09-28 12:40:07 rich Exp $
+  * $Id: ancient.mli,v 1.5 2006-10-06 15:03:47 rich Exp $
   *)
 
 type 'a ancient
@@ -103,7 +103,8 @@ val get : md -> int -> 'a ancient
     * You need to annotate the returned object with the correct
     * type.  As with the Marshal module, there is no type checking,
     * and setting the wrong type will likely cause a segfault
-    * or undefined behaviour.
+    * or undefined behaviour.  Note that the returned object has
+    * type [sometype ancient], not just [sometype].
     *
     * @raises [Not_found] if no object is associated with the key.
     *)

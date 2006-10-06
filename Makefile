@@ -1,5 +1,5 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.7 2006-10-06 12:26:31 rich Exp $
+# $Id: Makefile,v 1.8 2006-10-06 15:03:47 rich Exp $
 
 include Makefile.config
 
@@ -7,17 +7,19 @@ CC	:= gcc
 CFLAGS	:= -g -fPIC -Wall -Werror
 
 OCAMLCFLAGS	:= -g
-OCAMLCPACKAGES	:= 
-OCAMLCLIBS	:= 
+OCAMLCPACKAGES	:= -package unix
+OCAMLCLIBS	:= -linkpkg
 
 OCAMLOPTFLAGS	:=
 OCAMLOPTPACKAGES := $(OCAMLCPACKAGES)
-OCAMLOPTLIBS	:= 
+OCAMLOPTLIBS	:= -linkpkg
 
 OCAMLDOCFLAGS := -html -stars -sort $(OCAMLCPACKAGES)
 
 TARGETS		:= mmalloc ancient.cma ancient.cmxa META \
-		   test_ancient.opt test_ancient_shared.opt
+		   test_ancient_dict_write.opt \
+		   test_ancient_dict_verify.opt \
+		   test_ancient_dict_read.opt
 
 all:	$(TARGETS)
 
@@ -27,11 +29,15 @@ ancient.cma: ancient.cmo ancient_c.o
 ancient.cmxa: ancient.cmx ancient_c.o
 	ocamlmklib -o ancient -Lmmalloc -lmmalloc $^
 
-test_ancient.opt: ancient.cmxa test_ancient.cmx
+test_ancient_dict_write.opt: ancient.cmxa test_ancient_dict_write.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
 
-test_ancient_shared.opt: ancient.cmxa test_ancient_shared.cmx
+test_ancient_dict_verify.opt: ancient.cmxa test_ancient_dict_verify.cmx
+	LIBRARY_PATH=.:$$LIBRARY_PATH \
+	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
+
+test_ancient_dict_read.opt: ancient.cmxa test_ancient_dict_read.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
 
