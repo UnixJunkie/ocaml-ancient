@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.6 2006-09-28 12:40:07 rich Exp $
+ * $Id: ancient_c.c,v 1.7 2006-10-06 12:25:20 rich Exp $
  */
 
 #include <string.h>
@@ -32,7 +32,6 @@ typedef char page_table_entry;
 CAMLextern char *caml_heap_start;
 CAMLextern char *caml_heap_end;
 CAMLextern page_table_entry *caml_page_table;
-extern asize_t caml_page_low, caml_page_high;
 
 #define In_heap 1
 #define Not_in_heap 0
@@ -144,7 +143,7 @@ static header_t visited = (unsigned long) -1;
 // Temporary solution: 'ulimit -s unlimited'.  This function should
 // be replaced with something iterative.
 static size_t
-mark (value obj, area *ptr, area *restore, area *fixups)
+_mark (value obj, area *ptr, area *restore, area *fixups)
 {
   char *header = Hp_val (obj);
   assert (Wosize_hp (header) > 0); // Always true? (XXX)
@@ -177,7 +176,7 @@ mark (value obj, area *ptr, area *restore, area *fixups)
 
       if (Is_block (field) &&
 	  (Is_young (field) || Is_in_heap (field))) {
-	size_t field_offset = mark (field, ptr, restore, fixups);
+	size_t field_offset = _mark (field, ptr, restore, fixups);
 	if (field_offset == -1) return -1; // Propagate out of memory errors.
 
 	// Since the recursive call to mark above can reallocate the
@@ -187,7 +186,7 @@ mark (value obj, area *ptr, area *restore, area *fixups)
 
 	// Don't store absolute pointers yet because realloc will
 	// move the memory around.  Store a fake pointer instead.
-	// We'll fix up these fake pointers afterwards.
+	// We'll fix up these fake pointers afterwards in do_fixups.
 	Field (obj_copy, i) = field_offset + sizeof (header_t);
 
 	size_t fixup = (void *)&Field(obj_copy, i) - ptr->ptr;
@@ -260,7 +259,7 @@ do_fixups (area *ptr, area *fixups)
 }
 
 static void *
-do_mark (value obj,
+mark (value obj,
 	 void *(*realloc)(void *data, void *ptr, size_t size),
 	 void (*free)(void *data, void *ptr),
 	 void *data)
@@ -272,7 +271,7 @@ do_mark (value obj,
   area fixups; // List of fake pointers to be fixed up.
   area_init (&fixups);
 
-  if (mark (obj, &ptr, &restore, &fixups) == -1) {
+  if (_mark (obj, &ptr, &restore, &fixups) == -1) {
     // Ran out of memory.  Recover and throw an exception.
     area_free (&fixups);
     do_restore (&ptr, &restore);
@@ -312,7 +311,7 @@ ancient_mark (value obj)
   CAMLparam1 (obj);
   CAMLlocal1 (proxy);
 
-  void *ptr = do_mark (obj, my_realloc, my_free, 0);
+  void *ptr = mark (obj, my_realloc, my_free, 0);
 
   // Return the proxy.
   proxy = caml_alloc (1, Abstract_tag);
@@ -403,7 +402,7 @@ ancient_share (value mdv, value keyv, value obj)
   if (old_obj != 0) mfree (md, old_obj);
   mmalloc_setkey (md, key, 0);
 
-  void *ptr = do_mark (obj, mrealloc, mfree, md);
+  void *ptr = mark (obj, mrealloc, mfree, md);
 
   mmalloc_setkey (md, key, ptr);
 

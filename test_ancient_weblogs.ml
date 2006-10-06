@@ -1,5 +1,5 @@
 (* Load in large weblogs and see if they can still be used.
- * $Id: test_ancient_weblogs.ml,v 1.3 2006-09-28 12:40:07 rich Exp $
+ * $Id: test_ancient_weblogs.ml,v 1.4 2006-10-06 12:25:20 rich Exp $
  *)
 
 open Printf
@@ -71,6 +71,7 @@ let files =
 
   files
 
+(*
 (* XXX Linux/AMD64-specific hack to avoid bad mmap(2) allocation. *)
 let baseaddr = Nativeint.of_string "0x440000000000"
 
@@ -92,7 +93,36 @@ let () =
       gc_compact ()
   ) files;
 
+  Ancient.detach md
+*)
 
+let () =
+  let fd = Unix.openfile "test_ancient_weblogs.data" [Unix.O_RDWR] 0o644 in
+  let md = Ancient.attach fd 0n in
 
+  eprintf "Flattening ...\n%!";
+
+  (* Concatenate all the logs together. *)
+  let rows =
+    List.flatten (
+      List.mapi (
+	fun key _ ->
+	  let rows : Weblogs.t Ancient.ancient = Ancient.get md key in
+	  let rows = Ancient.follow rows in
+	  rows
+      ) files
+    ) in
+
+  eprintf "After flattening: %!";
+  gc_compact ();
+
+  (* Detect visitors.  Save to key 1023 in the file.  The detect_visitors
+   * function sorts each visitor.
+   *)
+  let visitors = Weblogs.detect_visitors rows in
+  ignore (Ancient.share md 1023 visitors);
+
+  eprintf "After detecting visitors: %!";
+  gc_compact ();
 
   Ancient.detach md
