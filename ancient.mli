@@ -1,5 +1,5 @@
 (** Mark objects as 'ancient' so they are taken out of the OCaml heap.
-  * $Id: ancient.mli,v 1.5 2006-10-06 15:03:47 rich Exp $
+  * $Id: ancient.mli,v 1.6 2006-10-09 12:18:05 rich Exp $
   *)
 
 type 'a ancient
@@ -28,6 +28,11 @@ val delete : 'a ancient -> unit
     * @raise [Invalid_argument "deleted"] if the object has been deleted.
     *
     * Forgetting to delete an ancient object results in a memory leak.
+    *)
+
+val is_ancient : 'a -> bool
+  (** [is_ancient ptr] returns true if [ptr] is an object on the ancient
+    * heap.
     *)
 
 (** {6 Shared memory mappings} *)
@@ -73,7 +78,7 @@ val share : md -> int -> 'a -> 'a ancient
     * file.  See {!Ancient.attach}, {!Ancient.detach}.
     *
     * More than one object can be stored in a file.  They are
-    * indexed using integers in the range [0..1023] (the limit
+    * indexed using integers in the range [0..max_key] (the limit
     * is hard-coded in [mmalloc/mmprivate.h]).  The [key] parameter
     * controls which object is written/overwritten by [share].
     * If you do not wish to use this feature, just pass [0]
@@ -96,7 +101,7 @@ val get : md -> int -> 'a ancient
   (** [get md key] returns the object indexed by [key] in the
     * attached file.
     *
-    * The key is in the range [0..1023] (the limit is hard-coded in
+    * The key is in the range [0..max_key] (the limit is hard-coded in
     * [mmalloc/mmprivate.h]).  If you do not wish to use this feature,
     * just pass [0] as the key when sharing / getting.
     *
@@ -108,3 +113,5 @@ val get : md -> int -> 'a ancient
     *
     * @raises [Not_found] if no object is associated with the key.
     *)
+
+val max_key : int

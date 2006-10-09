@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.7 2006-10-06 12:25:20 rich Exp $
+ * $Id: ancient_c.c,v 1.8 2006-10-09 12:18:05 rich Exp $
  */
 
 #include <string.h>
@@ -145,17 +145,21 @@ static header_t visited = (unsigned long) -1;
 static size_t
 _mark (value obj, area *ptr, area *restore, area *fixups)
 {
-  char *header = Hp_val (obj);
-  assert (Wosize_hp (header) > 0); // Always true? (XXX)
-
   // XXX This assertion might fail if someone tries to mark an object
   // which is already ancient.
   assert (Is_young (obj) || Is_in_heap (obj));
+
+  char *header = Hp_val (obj);
 
   // If we've already visited this object, just return its offset
   // in the out-of-heap memory.
   if (memcmp (header, &visited, sizeof visited) == 0)
     return (Long_val (Field (obj, 0)));
+
+  // XXX Actually this fails if you try to persist a zero-length
+  // array.  Needs to be fixed, but it breaks some rather important
+  // functions below.
+  assert (Wosize_hp (header) > 0);
 
   // Offset where we will store this object in the out-of-heap memory.
   size_t offset = ptr->n;
@@ -351,6 +355,17 @@ ancient_delete (value obj)
   Field (obj, 0) = Val_long (0);
 
   CAMLreturn (Val_unit);
+}
+
+CAMLprim value
+ancient_is_ancient (value obj)
+{
+  CAMLparam1 (obj);
+  CAMLlocal1 (v);
+
+  v = Is_young (obj) || Is_in_heap (obj) ? Val_false : Val_true;
+
+  CAMLreturn (v);
 }
 
 CAMLprim value

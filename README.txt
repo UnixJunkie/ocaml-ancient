@@ -1,6 +1,6 @@
 'Ancient' module for OCaml
 ----------------------------------------------------------------------
-$Id: README.txt,v 1.1 2006-10-06 15:03:47 rich Exp $
+$Id: README.txt,v 1.2 2006-10-09 12:18:05 rich Exp $
 
 What does this module do?
 ----------------------------------------------------------------------
@@ -191,6 +191,50 @@ whole lot back into memory.  A better arrangement would have been:
 which avoids loading unused fields at all.  In some circumstances we
 have shown that this could make a huge difference to performance, but
 we are not sure how to implement this cleanly in the current library.
+
+(7) [Advanced topic] Certain techniques such as Address Space
+Randomisation (http://lwn.net/Articles/121845/) are probably not
+compatible with the Ancient module and shared files.  Because the
+ancient data structures contain real pointers, these pointers would be
+invalidated if the shared file was not mapped in at precisely the same
+base address in all processes which are sharing the file.
+
+One solution might be to use private mappings and a list of fixups.
+In fact, the code actually builds a list of fixups currently while
+marking, because it needs to deal with precisely this issue (during
+marking, memory is allocated with realloc which might move the memory
+segment, thus real pointers cannot be stored while marking, but need
+to be fixed up afterwards).  The list of fixups would need to be
+stored alongside the memory segment (currently it is discarded after
+marking), and the file would need to be mapped in using MAP_PRIVATE
+(see below).
+
+A possible problem with this is that because OCaml objects tend to be
+small and contain a lot of pointers, it is likely that fixing up the
+pointers would result in every page in the memory segment becoming
+dirty, which would basically cancel out any benefit of using shared
+mappings in the first place.  However it is likely that some users of
+this module have large amounts of opaque data and few pointers, and
+for them this would be worthwhile.
+
+(8) Currently mmalloc is implemented so that the file is mapped in
+PROT_READ|PROT_WRITE and MAP_SHARED.  Ancient data structures are
+supposed to be immutable so strictly speaking write access shouldn't
+be required.  It may be worthwhile modifying mmalloc to allow
+read-only mappings, and private mappings.
+
+(9) The library assumes that every OCaml object is at least one word
+long.  This seemed like a good assumption up until I found that
+zero-length arrays are valid zero word objects.  At the moment you
+cannot mark structures which contain zero-length arrays -- you will
+get an assert-failure in the _mark function.
+
+Possibly there are other types of OCaml structure which are zero word
+objects and also cannot be marked.  I'm not sure what these will be:
+for example empty strings are stored as one word OCaml objects, so
+they are OK.
+
+The solution to this bug is non-trivial.
 
 Authors
 ----------------------------------------------------------------------
