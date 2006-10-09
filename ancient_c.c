@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.8 2006-10-09 12:18:05 rich Exp $
+ * $Id: ancient_c.c,v 1.9 2006-10-09 14:43:00 rich Exp $
  */
 
 #include <string.h>
@@ -210,7 +210,8 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   // what was in that field before.
   // (3) We can overwrite the header with all 1's to indicate that
   // we've visited (but see notes on 'static header_t visited' above).
-  // (4) All objects in OCaml are at least one word long (we hope!).
+  // (4) All objects in OCaml are at least one word long (XXX - actually
+  // this is not true).
   struct restore_item restore_item;
   restore_item.header = header;
   restore_item.field_zero = Field (obj, 0);
@@ -264,9 +265,10 @@ do_fixups (area *ptr, area *fixups)
 
 static void *
 mark (value obj,
-	 void *(*realloc)(void *data, void *ptr, size_t size),
-	 void (*free)(void *data, void *ptr),
-	 void *data)
+      void *(*realloc)(void *data, void *ptr, size_t size),
+      void (*free)(void *data, void *ptr),
+      void *data,
+      size_t *r_size)
 {
   area ptr; // This will be the out of heap area.
   area_init_custom (&ptr, realloc, free, data);
@@ -294,6 +296,7 @@ mark (value obj,
   do_fixups (&ptr, &fixups);
   area_free (&fixups);
 
+  if (r_size) *r_size = ptr.size;
   return ptr.ptr;
 }
 
@@ -310,18 +313,27 @@ my_free (void *data __attribute__((unused)), void *ptr)
 }
 
 CAMLprim value
-ancient_mark (value obj)
+ancient_mark_info (value obj)
 {
   CAMLparam1 (obj);
-  CAMLlocal1 (proxy);
+  CAMLlocal3 (proxy, info, rv);
 
-  void *ptr = mark (obj, my_realloc, my_free, 0);
+  size_t size;
+  void *ptr = mark (obj, my_realloc, my_free, 0, &size);
 
-  // Return the proxy.
+  // Make the proxy.
   proxy = caml_alloc (1, Abstract_tag);
   Field (proxy, 0) = (value) ptr;
 
-  CAMLreturn (proxy);
+  // Make the info struct.
+  info = caml_alloc (1, 0);
+  Field (info, 0) = Val_long (size);
+
+  rv = caml_alloc (2, 0);
+  Field (rv, 0) = proxy;
+  Field (rv, 1) = info;
+
+  CAMLreturn (rv);
 }
 
 CAMLprim value
@@ -404,10 +416,10 @@ ancient_detach (value mdv)
 }
 
 CAMLprim value
-ancient_share (value mdv, value keyv, value obj)
+ancient_share_info (value mdv, value keyv, value obj)
 {
   CAMLparam3 (mdv, keyv, obj);
-  CAMLlocal1 (proxy);
+  CAMLlocal3 (proxy, info, rv);
 
   void *md = (void *) Field (mdv, 0);
   int key = Int_val (keyv);
@@ -417,15 +429,24 @@ ancient_share (value mdv, value keyv, value obj)
   if (old_obj != 0) mfree (md, old_obj);
   mmalloc_setkey (md, key, 0);
 
-  void *ptr = mark (obj, mrealloc, mfree, md);
+  size_t size;
+  void *ptr = mark (obj, mrealloc, mfree, md, &size);
 
   mmalloc_setkey (md, key, ptr);
 
-  // Return the proxy.
+  // Make the proxy.
   proxy = caml_alloc (1, Abstract_tag);
   Field (proxy, 0) = (value) ptr;
 
-  CAMLreturn (proxy);
+  // Make the info struct.
+  info = caml_alloc (1, 0);
+  Field (info, 0) = Val_long (size);
+
+  rv = caml_alloc (2, 0);
+  Field (rv, 0) = proxy;
+  Field (rv, 1) = info;
+
+  CAMLreturn (rv);
 }
 
 CAMLprim value

@@ -1,5 +1,5 @@
 (** Mark objects as 'ancient' so they are taken out of the OCaml heap.
-  * $Id: ancient.mli,v 1.6 2006-10-09 12:18:05 rich Exp $
+  * $Id: ancient.mli,v 1.7 2006-10-09 14:43:00 rich Exp $
   *)
 
 type 'a ancient
@@ -115,3 +115,19 @@ val get : md -> int -> 'a ancient
     *)
 
 val max_key : int
+
+(** {6 Additional information} *)
+
+type info = {
+  i_size : int;				(** Allocated size, bytes. *)
+}
+  (** Extra information fields.  See {!Ancient.mark_info} and
+    * {!Ancient.share_info}.
+    *)
+
+val mark_info : 'a -> 'a ancient * info
+  (** Same as {!Ancient.mark}, but also returns some extra information. *)
+
+val share_info : md -> int -> 'a -> 'a ancient * info
+  (** Same as {!Ancient.share}, but also returns some extra information. *)
+
