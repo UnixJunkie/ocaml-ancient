@@ -1,6 +1,6 @@
 'Ancient' module for OCaml
 ----------------------------------------------------------------------
-$Id: README.txt,v 1.2 2006-10-09 12:18:05 rich Exp $
+$Id: README.txt,v 1.3 2006-10-13 12:28:20 rich Exp $
 
 What does this module do?
 ----------------------------------------------------------------------
@@ -133,11 +133,7 @@ data to OCaml heap data.  In theory it should be possible to modify
 ancient data to point to other ancient data, but we have not tried
 this.
 
-(5) You can store more than just one compound object per backing file
-by supplying a key to Ancient.share and Ancient.get.  The keys are
-integers in the range [0..1023].  The upper limit is hard coded into
-the mmalloc library.  This hard coded upper limit is a bug which
-should be fixed.
+(5) [Limit on number of keys -- issue fixed]
 
 (6) [Advanced topic] The _mark function in ancient_c.c makes no
 attempt to arrange the data structures in memory / on disk in a way

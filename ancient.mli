@@ -1,5 +1,5 @@
 (** Mark objects as 'ancient' so they are taken out of the OCaml heap.
-  * $Id: ancient.mli,v 1.7 2006-10-09 14:43:00 rich Exp $
+  * $Id: ancient.mli,v 1.8 2006-10-13 12:28:20 rich Exp $
   *)
 
 type 'a ancient
@@ -33,6 +33,11 @@ val delete : 'a ancient -> unit
 val is_ancient : 'a -> bool
   (** [is_ancient ptr] returns true if [ptr] is an object on the ancient
     * heap.
+    *)
+
+val address_of : 'a -> nativeint
+  (** [address_of obj] returns the address of [obj], or [0n] if [obj]
+    * is not a block.
     *)
 
 (** {6 Shared memory mappings} *)
@@ -77,10 +82,8 @@ val share : md -> int -> 'a -> 'a ancient
     * other OCaml processes which can access the underlying
     * file.  See {!Ancient.attach}, {!Ancient.detach}.
     *
-    * More than one object can be stored in a file.  They are
-    * indexed using integers in the range [0..max_key] (the limit
-    * is hard-coded in [mmalloc/mmprivate.h]).  The [key] parameter
-    * controls which object is written/overwritten by [share].
+    * More than one object can be stored in a file.  The [key]
+    * parameter controls which object is written/overwritten by [share].
     * If you do not wish to use this feature, just pass [0]
     * as the key.
     *
@@ -101,9 +104,7 @@ val get : md -> int -> 'a ancient
   (** [get md key] returns the object indexed by [key] in the
     * attached file.
     *
-    * The key is in the range [0..max_key] (the limit is hard-coded in
-    * [mmalloc/mmprivate.h]).  If you do not wish to use this feature,
-    * just pass [0] as the key when sharing / getting.
+    * For details of the [key] parameter see {!Ancient.share}.
     *
     * You need to annotate the returned object with the correct
     * type.  As with the Marshal module, there is no type checking,
@@ -113,8 +114,6 @@ val get : md -> int -> 'a ancient
     *
     * @raises [Not_found] if no object is associated with the key.
     *)
-
-val max_key : int
 
 (** {6 Additional information} *)
 

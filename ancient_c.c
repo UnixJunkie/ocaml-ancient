@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.9 2006-10-09 14:43:00 rich Exp $
+ * $Id: ancient_c.c,v 1.10 2006-10-13 12:28:20 rich Exp $
  */
 
 #include <string.h>
@@ -381,6 +381,18 @@ ancient_is_ancient (value obj)
 }
 
 CAMLprim value
+ancient_address_of (value obj)
+{
+  CAMLparam1 (obj);
+  CAMLlocal1 (v);
+
+  if (Is_block (obj)) v = caml_copy_nativeint ((intnat) obj);
+  else v = caml_copy_nativeint (0);
+
+  CAMLreturn (v);
+}
+
+CAMLprim value
 ancient_attach (value fdv, value baseaddrv)
 {
   CAMLparam2 (fdv, baseaddrv);
@@ -415,6 +427,11 @@ ancient_detach (value mdv)
   CAMLreturn (Val_unit);
 }
 
+struct keytable {
+  void **keys;
+  int allocated;
+};
+
 CAMLprim value
 ancient_share_info (value mdv, value keyv, value obj)
 {
@@ -424,15 +441,39 @@ ancient_share_info (value mdv, value keyv, value obj)
   void *md = (void *) Field (mdv, 0);
   int key = Int_val (keyv);
 
-  // Existing key exists?  Free it.
-  void *old_obj = mmalloc_getkey (md, key);
-  if (old_obj != 0) mfree (md, old_obj);
-  mmalloc_setkey (md, key, 0);
+  // Get the key table.
+  struct keytable *keytable = mmalloc_getkey (md, 0);
+  if (keytable == 0) {
+    keytable = mmalloc (md, sizeof (struct keytable));
+    if (keytable == 0) caml_failwith ("out of memory");
+    keytable->keys = 0;
+    keytable->allocated = 0;
+    mmalloc_setkey (md, 0, keytable);
+  }
 
+  // Existing key exists?  Free it.
+  if (key < keytable->allocated && keytable->keys[key] != 0) {
+    mfree (md, keytable->keys[key]);
+    keytable->keys[key] = 0;
+  }
+
+  // Keytable large enough?  If not, realloc it.
+  if (key >= keytable->allocated) {
+    int allocated = keytable->allocated == 0 ? 32 : keytable->allocated * 2;
+    void **keys = mrealloc (md, keytable->keys, allocated * sizeof (void *));
+    if (keys == 0) caml_failwith ("out of memory");
+    int i;
+    for (i = keytable->allocated; i < allocated; ++i) keys[i] = 0;
+    keytable->keys = keys;
+    keytable->allocated = allocated;
+  }
+
+  // Do the mark.
   size_t size;
   void *ptr = mark (obj, mrealloc, mfree, md, &size);
 
-  mmalloc_setkey (md, key, ptr);
+  // Add the key to the keytable.
+  keytable->keys[key] = ptr;
 
   // Make the proxy.
   proxy = caml_alloc (1, Abstract_tag);
@@ -458,8 +499,11 @@ ancient_get (value mdv, value keyv)
   void *md = (void *) Field (mdv, 0);
   int key = Int_val (keyv);
 
-  void *ptr = mmalloc_getkey (md, key);
-  if (!ptr) caml_raise_not_found ();
+  // Key exists?
+  struct keytable *keytable = mmalloc_getkey (md, 0);
+  if (keytable == 0 || key >= keytable->allocated || keytable->keys[key] == 0)
+    caml_raise_not_found ();
+  void *ptr = keytable->keys[key];
 
   // Return the proxy.
   proxy = caml_alloc (1, Abstract_tag);
