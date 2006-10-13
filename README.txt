@@ -1,6 +1,6 @@
 'Ancient' module for OCaml
 ----------------------------------------------------------------------
-$Id: README.txt,v 1.3 2006-10-13 12:28:20 rich Exp $
+$Id: README.txt,v 1.4 2006-10-13 14:13:06 rich Exp $
 
 What does this module do?
 ----------------------------------------------------------------------
@@ -187,6 +187,11 @@ whole lot back into memory.  A better arrangement would have been:
 which avoids loading unused fields at all.  In some circumstances we
 have shown that this could make a huge difference to performance, but
 we are not sure how to implement this cleanly in the current library.
+
+[Update: I have fixed issue 6 manually for my Weblogs example and
+confirmed that it does make a huge difference to performance, although
+at considerable extra code complexity.  Interested people can see the
+weblogs library, file import_weblogs_ancient.ml.in].
 
 (7) [Advanced topic] Certain techniques such as Address Space
 Randomisation (http://lwn.net/Articles/121845/) are probably not
