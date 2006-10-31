@@ -35,6 +35,7 @@ mmalloc/mrealloc.c
 mmalloc/mvalloc.c
 mmalloc/sbrk-sup.c
 mmalloc/TODO
+ocaml_version.ml
 README.txt
 test_ancient_dict_read.ml
 test_ancient_dict_verify.ml

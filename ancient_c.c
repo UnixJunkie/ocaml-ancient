@@ -1,5 +1,5 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.10 2006-10-13 12:28:20 rich Exp $
+ * $Id: ancient_c.c,v 1.11 2006-10-31 14:39:50 rich Exp $
  */
 
 #include <string.h>
@@ -13,10 +13,16 @@
 
 #include "mmalloc/mmalloc.h"
 
+// uintnat, intnat only appeared in Caml 3.09.x.
+#if OCAML_VERSION_MAJOR == 3 && OCAML_VERSION_MINOR < 9
+typedef unsigned long uintnat;
+typedef long intnat;
+#endif
+
 // From byterun/misc.h:
 typedef char * addr;
 
-// From byterun/minor_gc.c:
+// From byterun/minor_gc.h:
 CAMLextern char *caml_young_start;
 CAMLextern char *caml_young_end;
 #define Is_young(val) \

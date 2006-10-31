@@ -1,10 +1,12 @@
 # Mark objects as 'ancient' so they are taken out of the OCaml heap.
-# $Id: Makefile,v 1.8 2006-10-06 15:03:47 rich Exp $
+# $Id: Makefile,v 1.9 2006-10-31 14:39:50 rich Exp $
 
 include Makefile.config
 
 CC	:= gcc
-CFLAGS	:= -g -fPIC -Wall -Werror
+CFLAGS	:= -g -fPIC -Wall -Werror \
+	-DOCAML_VERSION_MAJOR=$(OCAML_VERSION_MAJOR) \
+	-DOCAML_VERSION_MINOR=$(OCAML_VERSION_MINOR)
 
 OCAMLCFLAGS	:= -g
 OCAMLCPACKAGES	:= -package unix
