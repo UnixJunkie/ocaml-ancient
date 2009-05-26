@@ -6,7 +6,8 @@ include Makefile.config
 CC	:= gcc
 CFLAGS	:= -g -fPIC -Wall -Werror \
 	-DOCAML_VERSION_MAJOR=$(OCAML_VERSION_MAJOR) \
-	-DOCAML_VERSION_MINOR=$(OCAML_VERSION_MINOR)
+	-DOCAML_VERSION_MINOR=$(OCAML_VERSION_MINOR) \
+	-I$(shell ocamlc -where)
 
 OCAMLCFLAGS	:= -g
 OCAMLCPACKAGES	:= -package unix

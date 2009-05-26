@@ -19,6 +19,14 @@ typedef unsigned long uintnat;
 typedef long intnat;
 #endif
 
+/* We need the macro 'Is_in_young_or_heap' which tell us if a block
+ * address is within the OCaml minor or major heaps.  This comes out
+ * of the guts of OCaml.
+ */
+
+#if OCAML_VERSION_MAJOR == 3 && OCAML_VERSION_MINOR <= 10
+// Up to OCaml 3.10 there was a single contiguous page table.
+
 // From byterun/misc.h:
 typedef char * addr;
 
@@ -46,6 +54,47 @@ CAMLextern page_table_entry *caml_page_table;
   (assert (Is_block ((value) (p))),					\
    (addr)(p) >= (addr)caml_heap_start && (addr)(p) < (addr)caml_heap_end \
    && caml_page_table [Page (p)])
+
+#define Is_in_heap_or_young(p) (Is_young (p) || Is_in_heap (p))
+
+#else /* OCaml >= 3.11 */
+
+// GC was rewritten in OCaml 3.11 so there is no longer a
+// single contiguous page table.
+
+// From byterun/memory.h:
+#define Not_in_heap 0
+#define In_heap 1
+#define In_young 2
+#define In_static_data 4
+#define In_code_area 8
+
+#ifdef ARCH_SIXTYFOUR
+
+/* 64 bits: Represent page table as a sparse hash table */
+int caml_page_table_lookup(void * addr);
+#define Classify_addr(a) (caml_page_table_lookup((void *)(a)))
+
+#else
+
+/* 32 bits: Represent page table as a 2-level array */
+#define Pagetable2_log 11
+#define Pagetable2_size (1 << Pagetable2_log)
+#define Pagetable1_log (Page_log + Pagetable2_log)
+#define Pagetable1_size (1 << (32 - Pagetable1_log))
+CAMLextern unsigned char * caml_page_table[Pagetable1_size];
+
+#define Pagetable_index1(a) (((uintnat)(a)) >> Pagetable1_log)
+#define Pagetable_index2(a) \
+  ((((uintnat)(a)) >> Page_log) & (Pagetable2_size - 1))
+#define Classify_addr(a) \
+  caml_page_table[Pagetable_index1(a)][Pagetable_index2(a)]
+
+#endif
+
+#define Is_in_heap_or_young(a) (Classify_addr(a) & (In_heap | In_young))
+
+#endif /* OCaml >= 3.11 */
 
 // Area is an expandable buffer, allocated on the C heap.
 typedef struct area {
@@ -153,7 +202,7 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
 {
   // XXX This assertion might fail if someone tries to mark an object
   // which is already ancient.
-  assert (Is_young (obj) || Is_in_heap (obj));
+  assert (Is_in_heap_or_young (obj));
 
   char *header = Hp_val (obj);
 
@@ -185,7 +234,7 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
       value field = Field (obj, i);
 
       if (Is_block (field) &&
-	  (Is_young (field) || Is_in_heap (field))) {
+	  Is_in_heap_or_young (field)) {
 	size_t field_offset = _mark (field, ptr, restore, fixups);
 	if (field_offset == -1) return -1; // Propagate out of memory errors.
 
@@ -365,7 +414,7 @@ ancient_delete (value obj)
   if (Is_long (v)) caml_invalid_argument ("deleted");
 
   // Otherwise v is a pointer to the out of heap malloc'd object.
-  assert (!Is_young (v) && !Is_in_heap (v));
+  assert (!Is_in_heap_or_young (v));
   free ((void *) v);
 
   // Replace the proxy (a pointer) with an int 0 so we know it's
@@ -381,7 +430,7 @@ ancient_is_ancient (value obj)
   CAMLparam1 (obj);
   CAMLlocal1 (v);
 
-  v = Is_young (obj) || Is_in_heap (obj) ? Val_false : Val_true;
+  v = Is_in_heap_or_young (obj) ? Val_false : Val_true;
 
   CAMLreturn (v);
 }
