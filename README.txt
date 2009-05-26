@@ -66,6 +66,9 @@ uses the Ancient module:
 Example
 ----------------------------------------------------------------------
 
+XXX Note the example code is really stupid, and fails for large
+dictionaries.  See bug (10) below.
+
 Run:
 
   ulimit -s unlimited
@@ -235,6 +238,13 @@ for example empty strings are stored as one word OCaml objects, so
 they are OK.
 
 The solution to this bug is non-trivial.
+
+(10) Example code is very stupid.  It fails with large dictionaries,
+eg. the one with nearly 500,000 words found in Fedora.
+
+(11) In function 'mark', the "// Ran out of memory.  Recover and throw
+an exception." codepath actually fails if you use it - segfaulting
+inside do_restore.
 
 Authors
 ----------------------------------------------------------------------
