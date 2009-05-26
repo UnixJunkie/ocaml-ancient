@@ -1,9 +1,0 @@
-*.cmi
-*.cmo
-*.cmx
-*.cma
-*.cmxa
-*.opt
-META
-ancient-*.tar.gz
-dictionary.data
