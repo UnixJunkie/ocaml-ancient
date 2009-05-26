@@ -1,5 +1,5 @@
-.cvsignore
 .depend
+.gitignore
 ancient_c.c
 ancient.ml
 ancient.mli
@@ -13,7 +13,6 @@ mmalloc/ChangeLog
 mmalloc/configure
 mmalloc/configure.in
 mmalloc/COPYING.LIB
-mmalloc/.cvsignore
 mmalloc/detach.c
 mmalloc/keys.c
 mmalloc/MAINTAINERS
