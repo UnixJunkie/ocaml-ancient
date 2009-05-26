@@ -64,7 +64,7 @@ extern int getpagesize PARAMS ((void));
 PTR
 __mmalloc_mmap_morecore (mdp, size)
   struct mdesc *mdp;
-  int size;
+  size_t size;
 {
   PTR result = NULL;
   off_t foffset;	/* File offset at which new mapping will start */
@@ -169,7 +169,7 @@ __mmalloc_remap_core (mdp)
 
 PTR
 mmalloc_findbase (size)
-  int size;
+  size_t size;
 {
   int fd;
   int flags;
@@ -205,7 +205,8 @@ mmalloc_findbase (size)
 	 to signal an error return, and besides, it is useful to
 	 catch NULL pointers if it is unmapped.  Instead start
 	 at the next page boundary. */
-      base = (caddr_t) getpagesize ();
+      size_t tmp_pagesize = getpagesize ();
+      base = (caddr_t) tmp_pagesize;
     }
   else if (base == (caddr_t) -1)
     {

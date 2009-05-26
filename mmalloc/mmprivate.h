@@ -53,7 +53,7 @@ Boston, MA 02111-1307, USA.
 
 #define INT_BIT		(CHAR_BIT * sizeof(int))
 #define BLOCKLOG	(INT_BIT > 16 ? 12 : 9)
-#define BLOCKSIZE	((unsigned int) 1 << BLOCKLOG)
+#define BLOCKSIZE	((size_t) 1L << BLOCKLOG)
 #define BLOCKIFY(SIZE)	(((SIZE) + BLOCKSIZE - 1) / BLOCKSIZE)
 
 /* The difference between two pointers is a signed int.  On machines where
@@ -63,8 +63,8 @@ Boston, MA 02111-1307, USA.
    sign of the result is machine dependent for negative values, so force
    it to be treated as an unsigned int. */
 
-#define ADDR2UINT(addr)	((unsigned int) ((char *) (addr) - (char *) NULL))
-#define RESIDUAL(addr,bsize) ((unsigned int) (ADDR2UINT (addr) % (bsize)))
+#define ADDR2UINT(addr)	((size_t) ((char *) (addr) - (char *) NULL))
+#define RESIDUAL(addr,bsize) ((size_t) (ADDR2UINT (addr) % (bsize)))
 
 /* Determine the amount of memory spanned by the initial heap table
    (not an absolute limit).  */
@@ -191,7 +191,7 @@ struct mdesc
      FIXME:  For mapped regions shared by more than one process, this
      needs to be maintained on a per-process basis. */
 
-  PTR (*morecore) PARAMS ((struct mdesc *, int));
+  PTR (*morecore) PARAMS ((struct mdesc *, size_t));
      
   /* Pointer to the function that causes an abort when the memory checking
      features are activated.  By default this is set to abort(), but can
@@ -319,7 +319,7 @@ extern struct mdesc *__mmalloc_sbrk_init PARAMS ((void));
 
 #if defined(HAVE_MMAP)
 
-extern PTR __mmalloc_mmap_morecore PARAMS ((struct mdesc *, int));
+extern PTR __mmalloc_mmap_morecore PARAMS ((struct mdesc *, size_t));
 
 #endif
 

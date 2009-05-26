@@ -57,6 +57,6 @@ extern int mmalloc_errno PARAMS ((PTR));
 
 extern int mmtrace PARAMS ((void));
 
-extern PTR mmalloc_findbase PARAMS ((int));
+extern PTR mmalloc_findbase PARAMS ((size_t));
 
 #endif  /* MMALLOC_H */
