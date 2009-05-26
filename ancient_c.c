@@ -1,5 +1,4 @@
 /* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient_c.c,v 1.11 2006-10-31 14:39:50 rich Exp $
  */
 
 #include <string.h>

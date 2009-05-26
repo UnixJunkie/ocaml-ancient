@@ -1,6 +1,4 @@
-(* Mark objects as 'ancient' so they are taken out of the OCaml heap.
- * $Id: ancient.ml,v 1.7 2006-10-13 12:28:20 rich Exp $
- *)
+(* Mark objects as 'ancient' so they are taken out of the OCaml heap. *)
 
 type 'a ancient
 

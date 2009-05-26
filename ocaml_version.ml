@@ -1,6 +1,5 @@
 (* Get the major or minor part of the OCaml version string.
  * This doesn't seem t be present in header files (at least not in 3.08.x).
- * $Id: ocaml_version.ml,v 1.1 2006-10-31 14:39:50 rich Exp $
  *)
 type t = Major | Minor
 let usage () = failwith "ocaml_version major|minor"

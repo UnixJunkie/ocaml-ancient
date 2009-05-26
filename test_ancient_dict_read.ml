@@ -1,6 +1,4 @@
-(* Read shared dictionary.
- * $Id: test_ancient_dict_read.ml,v 1.1 2006-10-06 15:03:47 rich Exp $
- *)
+(* Read shared dictionary. *)
 
 open Printf
 open Unix
