@@ -17,13 +17,13 @@ val mark : 'a -> 'a ancient
 val follow : 'a ancient -> 'a
   (** Follow proxy link to out of heap object.
     *
-    * @raise [Invalid_argument "deleted"] if the object has been deleted.
+    * @raise Invalid_argument "deleted" if the object has been deleted.
     *)
 
 val delete : 'a ancient -> unit
   (** [delete obj] deletes ancient object [obj].
     *
-    * @raise [Invalid_argument "deleted"] if the object has been deleted.
+    * @raise Invalid_argument "deleted" if the object has been deleted.
     *
     * Forgetting to delete an ancient object results in a memory leak.
     *)
@@ -110,7 +110,7 @@ val get : md -> int -> 'a ancient
     * or undefined behaviour.  Note that the returned object has
     * type [sometype ancient], not just [sometype].
     *
-    * @raises [Not_found] if no object is associated with the key.
+    * @raise Not_found if no object is associated with the key.
     *)
 
 (** {6 Additional information} *)
@@ -127,4 +127,3 @@ val mark_info : 'a -> 'a ancient * info
 
 val share_info : md -> int -> 'a -> 'a ancient * info
   (** Same as {!Ancient.share}, but also returns some extra information. *)
-
