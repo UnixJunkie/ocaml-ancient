@@ -91,7 +91,7 @@ tr_mallochook (md, size)
   mdp -> mmalloc_hook = tr_mallochook;
 
   /* We could be printing a NULL here; that's OK.  */
-  fprintf (mallstream, "+ %08lx %x\n", (unsigned long) hdr, size);
+  fprintf (mallstream, "+ %08lx %lx\n", (unsigned long) hdr, size);
 
   if (hdr == mallwatch)
     tr_break ();
@@ -122,9 +122,9 @@ tr_reallochook (md, ptr, size)
   mdp -> mrealloc_hook = tr_reallochook;
   if (hdr == NULL)
     /* Failed realloc.  */
-    fprintf (mallstream, "! %08lx %x\n", (unsigned long) ptr, size);
+    fprintf (mallstream, "! %08lx %lx\n", (unsigned long) ptr, size);
   else
-    fprintf (mallstream, "< %08lx\n> %08lx %x\n", (unsigned long) ptr,
+    fprintf (mallstream, "< %08lx\n> %08lx %lx\n", (unsigned long) ptr,
 	     (unsigned long) hdr, size);
 
   if (hdr == mallwatch)
