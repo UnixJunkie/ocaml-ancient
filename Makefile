@@ -67,7 +67,8 @@ META:	META.in Makefile.config
 # Clean.
 
 clean:
-	rm -f *.cmi *.cmo *.cmx *.cma *.cmxa *.o *.a *.so *~ core META *.opt
+	rm -f *.cmi *.cmo *.cmx *.cma *.cmxa *.o *.a *.so *~ core META \
+	   *.opt .depend
 	$(MAKE) -C mmalloc clean
 
 # Dependencies.
