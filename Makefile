@@ -135,7 +135,7 @@ dpkg:
 doc:
 	rm -rf html
 	mkdir html
-	-ocamlfind ocamldoc $(OCAMLDOCFLAGS) -d html ancient.ml{i,}
+	-ocamlfind ocamldoc $(OCAMLDOCFLAGS) -d html ancient.mli
 
 .PHONY:	depend dist check-manifest dpkg doc mmalloc
 
