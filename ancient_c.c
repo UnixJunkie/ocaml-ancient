@@ -171,7 +171,7 @@ area_free (area *a)
 }
 
 struct restore_item {
-  char *header;
+  header_t *header;
   value field_zero;
 };
 
@@ -205,7 +205,7 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   // which is already ancient.
   assert (Is_in_heap_or_young (obj));
 
-  char *header = Hp_val (obj);
+  header_t *header = Hp_val (obj);
 
   // If we've already visited this object, just return its offset
   // in the out-of-heap memory.
