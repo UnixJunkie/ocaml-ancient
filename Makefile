@@ -86,10 +86,10 @@ endif
 # Install.
 
 install:
-	rm -rf $(DESTDIR)$(OCAMLLIBDIR)/ancient
-	install -c -m 0755 -d $(DESTDIR)$(OCAMLLIBDIR)/ancient
-	install -c -m 0644 *.cmi *.mli *.cma *.cmxa *.a META \
-	  $(DESTDIR)$(OCAMLLIBDIR)/ancient
+	rm -rf $(DESTDIR)/ancient
+	install -c -m 0755 -d $(DESTDIR)/ancient
+	install -c -m 0644 *.cmi *.mli *.cma *.cmxa *.a mmalloc/*.a META \
+	  $(DESTDIR)/ancient
 
 # Distribution.
 
