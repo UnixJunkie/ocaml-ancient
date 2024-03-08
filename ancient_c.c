@@ -4,96 +4,24 @@
 #include <string.h>
 #include <assert.h>
 
+#define CAML_INTERNALS
+
 #include <caml/config.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/mlvalues.h>
 #include <caml/fail.h>
+#include <caml/address_class.h>
+
+#if OCAML_VERSION_MAJOR == 5
+#include <caml/shared_heap.h>
+#define Ancient_blackhd_hd(hd) With_status_hd (hd, NOT_MARKABLE)
+#else
+#define Ancient_blackhd_hd(hd) Blackhd_hd(hd)
+
+#endif
 
 #include "mmalloc/mmalloc.h"
-
-// uintnat, intnat only appeared in Caml 3.09.x.
-#if OCAML_VERSION_MAJOR == 3 && OCAML_VERSION_MINOR < 9
-typedef unsigned long uintnat;
-typedef long intnat;
-#endif
-
-/* We need the macro 'Is_in_young_or_heap' which tell us if a block
- * address is within the OCaml minor or major heaps.  This comes out
- * of the guts of OCaml.
- */
-
-#if OCAML_VERSION_MAJOR == 3 && OCAML_VERSION_MINOR <= 10
-// Up to OCaml 3.10 there was a single contiguous page table.
-
-// From byterun/misc.h:
-typedef char * addr;
-
-// From byterun/minor_gc.h:
-CAMLextern char *caml_young_start;
-CAMLextern char *caml_young_end;
-#define Is_young(val) \
-  (assert (Is_block (val)),						\
-   (addr)(val) < (addr)caml_young_end && (addr)(val) > (addr)caml_young_start)
-
-// From byterun/major_gc.h:
-#ifdef __alpha
-typedef int page_table_entry;
-#else
-typedef char page_table_entry;
-#endif
-CAMLextern char *caml_heap_start;
-CAMLextern char *caml_heap_end;
-CAMLextern page_table_entry *caml_page_table;
-
-#define In_heap 1
-#define Not_in_heap 0
-#define Page(p) ((uintnat) (p) >> Page_log)
-#define Is_in_heap(p) \
-  (assert (Is_block ((value) (p))),					\
-   (addr)(p) >= (addr)caml_heap_start && (addr)(p) < (addr)caml_heap_end \
-   && caml_page_table [Page (p)])
-
-#define Is_in_heap_or_young(p) (Is_young (p) || Is_in_heap (p))
-
-#else /* OCaml >= 3.11 */
-
-// GC was rewritten in OCaml 3.11 so there is no longer a
-// single contiguous page table.
-
-// From byterun/memory.h:
-#define Not_in_heap 0
-#define In_heap 1
-#define In_young 2
-#define In_static_data 4
-#define In_code_area 8
-
-#ifdef ARCH_SIXTYFOUR
-
-/* 64 bits: Represent page table as a sparse hash table */
-int caml_page_table_lookup(void * addr);
-#define Classify_addr(a) (caml_page_table_lookup((void *)(a)))
-
-#else
-
-/* 32 bits: Represent page table as a 2-level array */
-#define Pagetable2_log 11
-#define Pagetable2_size (1 << Pagetable2_log)
-#define Pagetable1_log (Page_log + Pagetable2_log)
-#define Pagetable1_size (1 << (32 - Pagetable1_log))
-CAMLextern unsigned char * caml_page_table[Pagetable1_size];
-
-#define Pagetable_index1(a) (((uintnat)(a)) >> Pagetable1_log)
-#define Pagetable_index2(a) \
-  ((((uintnat)(a)) >> Page_log) & (Pagetable2_size - 1))
-#define Classify_addr(a) \
-  caml_page_table[Pagetable_index1(a)][Pagetable_index2(a)]
-
-#endif
-
-#define Is_in_heap_or_young(a) (Classify_addr(a) & (In_heap | In_young))
-
-#endif /* OCaml >= 3.11 */
 
 // Area is an expandable buffer, allocated on the C heap.
 typedef struct area {
@@ -198,6 +126,16 @@ static header_t visited = (unsigned long) -1;
 // XXX Large, deeply recursive structures cause a stack overflow.
 // Temporary solution: 'ulimit -s unlimited'.  This function should
 // be replaced with something iterative.
+
+/*
+ * obj: source object
+ * ptr: destination
+ * restore: a list of pointers that we modified that we should restore
+   at the end of the marking
+ * fixups: a list of pointers that we have created that we may need to
+   update if we realloc the destination
+ */
+
 static size_t
 _mark (value obj, area *ptr, area *restore, area *fixups)
 {
@@ -205,7 +143,7 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   // which is already ancient.
   assert (Is_in_heap_or_young (obj));
 
-  header_t *header = Hp_val (obj);
+  header_t *header = (header_t *) Hp_val (obj);
 
   // If we've already visited this object, just return its offset
   // in the out-of-heap memory.
@@ -224,6 +162,10 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   size_t bytes = Bhsize_hp (header);
   if (area_append (ptr, header, bytes) == -1)
     return -1;			// Error out of memory.
+
+  // Color in black the header of the copied block
+  header_t hd = Hd_val (obj);
+  *(header_t *) (ptr->ptr + offset) = Ancient_blackhd_hd (hd);
 
   // Scan the fields looking for pointers to blocks.
   int can_scan = Tag_val (obj) < No_scan_tag;

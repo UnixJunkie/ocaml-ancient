@@ -16,3 +16,5 @@ mmalloc/autom4te.cache
 mmalloc/config.cache
 mmalloc/config.log
 mmalloc/config.status
+/.depend
+/_opam
