@@ -255,6 +255,9 @@ Xavier Leroy and Damien Doligez.
 
 mmalloc was written by Mike Haertel and Fred Fish.
 
+Port to no-naked-pointers and OCaml 5+ by Fabrice Le Fessant at
+OCamlPro.
+
 License
 ----------------------------------------------------------------------
 
