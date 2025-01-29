@@ -1,5 +1,6 @@
 (* Create shared dictionary. *)
 
+open Test_ancient_dict
 open Printf
 open Unix
 
@@ -25,8 +26,7 @@ let md =
 
 let arraysize = 256 (* one element for each character *)
 
-type t = Not_Found | Exists of t array | Not_Exists of t array;;
-let tree : t array = Array.make arraysize Not_Found
+let tree : tree array = Array.make arraysize Not_Found
 
 let add_to_tree word =
   let len = String.length word in
@@ -41,7 +41,9 @@ let add_to_tree word =
 	  let tree' = Array.make arraysize Not_Found in
 	  (!tree).(c) <- Not_Exists tree';
 	  tree := tree'
-      | Exists tree'
+      | Exists (witness, tree') ->
+        assert ( Array.length witness = witness_size);
+	tree := tree'
       | Not_Exists tree' ->
 	  tree := tree'
     done;
@@ -51,10 +53,12 @@ let add_to_tree word =
     let c = Char.code c in
     match (!tree).(c) with
     | Not_Found ->
-	(!tree).(c) <- Exists (Array.make arraysize Not_Found)
-    | Exists _ -> () (* same word added twice *)
+	(!tree).(c) <- Exists (Array.make witness_size 0, Array.make arraysize Not_Found)
+    | Exists (witness, _) ->
+      assert ( Array.length witness = witness_size);
+      () (* same word added twice *)
     | Not_Exists tree' ->
-	(!tree).(c) <- Exists tree'
+	(!tree).(c) <- Exists (Array.make witness_size 0,tree')
   )
 
 let () =
