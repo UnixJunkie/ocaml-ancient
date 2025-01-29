@@ -103,11 +103,14 @@ struct restore_item {
   value field_zero;
 };
 
-// When a block is visited, we overwrite the header with all 1's.
-// This is not quite an impossible value - one could imagine an
-// enormous custom block where the header could take on this
-// value. (XXX)
-static header_t visited = (unsigned long) -1;
+/* When a block is visited, we set its tag to Double_tag, and its
+ * wosize to 10. This header is impossible to generate in a classical
+ * OCaml runtime (idea by Damien Doligez)
+ */
+
+#define ATOM_OFFSET 10
+static header_t visited = Make_header(10, Double_tag, 0);
+static value atoms[256];
 
 // The general plan here:
 //
@@ -141,7 +144,7 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
 {
   // XXX This assertion might fail if someone tries to mark an object
   // which is already ancient.
-  assert (Is_in_heap_or_young (obj));
+  assert (Is_in_value_area (obj));
 
   header_t *header_ptr = (header_t *) Hp_val (obj);
   header_t hd = Hd_hp (header_ptr);
@@ -151,11 +154,14 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   if ( hd == visited )
     return (Long_val (Field (obj, 0)));
 
-  // XXX Actually this fails if you try to persist a zero-length
-  // array.  Needs to be fixed, but it breaks some rather important
-  // functions below.
   int wosize = Wosize_hd (hd);
-  assert ( wosize > 0);
+  int tag = Tag_hd (hd);
+
+  /* block is of size 0, and the corresponding atom was already
+   * allocated, we don't need to do anything */
+  if ( wosize == 0 && atoms[tag] != 0){
+	  return atoms[tag] - ATOM_OFFSET;
+  }
 
   // Offset where we will store this object in the out-of-heap memory.
   size_t offset = ptr->n;
@@ -165,32 +171,42 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   if (area_append (ptr, header_ptr, bytes) == -1)
     return -1;			// Error out of memory.
 
+  if ( wosize == 0 ){
+	  atoms[tag] = offset + ATOM_OFFSET ;
+	  Hd_hp (ptr->ptr+offset) = Ancient_blackhd_hd (hd);
+	  return offset ;
+  }
+
   // Scan the fields looking for pointers to blocks.
-  int can_scan = Tag_hd (hd) < No_scan_tag;
+  int can_scan = tag < No_scan_tag;
   if (can_scan) {
     mlsize_t i;
 
     for (i = 0; i < wosize; ++i) {
-      value field = Field (obj, i);
+	    value field = Field (obj, i);
 
-      if (Is_block (field) &&
-	  Is_in_heap_or_young (field)) {
-	size_t field_offset = _mark (field, ptr, restore, fixups);
-	if (field_offset == -1) return -1; // Propagate out of memory errors.
+	    if (Is_block (field) && Is_in_value_area (field)){
+		    size_t field_offset =
+			    _mark (field, ptr, restore, fixups);
+		    // Propagate out of memory errors.
+		    if (field_offset == -1) return -1;
 
-	// Since the recursive call to mark above can reallocate the
-	// area, we need to recompute these each time round the loop.
-	char *obj_copy_header = ptr->ptr + offset;
-	value obj_copy = Val_hp (obj_copy_header);
+		    // Since the recursive call to mark above can
+		    // reallocate the area, we need to recompute these
+		    // each time round the loop.
+		    char *obj_copy_header = ptr->ptr + offset;
+		    value obj_copy = Val_hp (obj_copy_header);
 
-	// Don't store absolute pointers yet because realloc will
-	// move the memory around.  Store a fake pointer instead.
-	// We'll fix up these fake pointers afterwards in do_fixups.
-	Field (obj_copy, i) = field_offset + sizeof (header_t);
+		    // Don't store absolute pointers yet because
+		    // realloc will move the memory around.  Store a
+		    // fake pointer instead.  We'll fix up these fake
+		    // pointers afterwards in do_fixups.
+		    Field (obj_copy, i) =
+			    field_offset + sizeof (header_t);
 
-	size_t fixup = (void *)&Field(obj_copy, i) - ptr->ptr;
-	area_append (fixups, &fixup, sizeof fixup);
-      }
+		    size_t fixup = (void *)&Field(obj_copy, i) - ptr->ptr;
+		    area_append (fixups, &fixup, sizeof fixup);
+	    }
     }
   }
 
@@ -208,6 +224,7 @@ _mark (value obj, area *ptr, area *restore, area *fixups)
   // (4) All objects in OCaml are at least one word long (XXX - actually
   // this is not true).
   struct restore_item restore_item;
+
   restore_item.header_ptr = header_ptr;
   restore_item.field_zero = Field (obj, 0);
   area_append (restore, &restore_item, sizeof restore_item);
@@ -227,6 +244,7 @@ do_restore (area *ptr, area *restore)
     {
       struct restore_item *restore_item =
 	(struct restore_item *)(restore->ptr + i);
+
       assert ( Hd_hp (restore_item->header_ptr) == visited );
 
       value obj = Val_hp (restore_item->header_ptr);
@@ -269,12 +287,19 @@ mark (value obj,
       void *data,
       size_t *r_size)
 {
+	int i;
+
   area ptr; // This will be the out of heap area.
   area_init_custom (&ptr, realloc, free, data);
   area restore; // Headers to be fixed up after.
   area_init (&restore);
   area fixups; // List of fake pointers to be fixed up.
   area_init (&fixups);
+
+  /* reset atoms */
+  for (i=0; i<256; i++){
+	  atoms[i] = 0;
+  }
 
   if (_mark (obj, &ptr, &restore, &fixups) == -1) {
     // Ran out of memory.  Recover and throw an exception.
