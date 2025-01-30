@@ -1,5 +1,6 @@
 (* Verify shared dictionary. *)
 
+open Test_ancient_dict
 open Printf
 open Unix
 
@@ -19,8 +20,7 @@ let md =
 
 let arraysize = 256 (* one element for each character *)
 
-type t = Not_Found | Exists of t array | Not_Exists of t array;;
-let tree : t array Ancient.ancient = Ancient.get md 0
+let tree : tree array Ancient.ancient = Ancient.get md 0
 let tree = Ancient.follow tree
 
 let word_exists word =
@@ -32,7 +32,7 @@ let word_exists word =
       let c = Char.code c in
       match (!tree).(c) with
       | Not_Found -> raise Not_found
-      | Exists tree'
+      | Exists (_,tree')
       | Not_Exists tree' -> tree := tree'
     done;
 
@@ -69,7 +69,8 @@ let () =
       for i = 0 to arraysize-1 do
 	match tree.(i) with
 	| Not_Found -> ()
-	| Exists tree ->
+        | Exists (witness,tree) ->
+            assert ( Array.length witness = witness_size);
 	    c := !c + 1 + count tree
 	| Not_Exists tree ->
 	    c := !c + count tree

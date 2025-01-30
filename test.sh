@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ev
+
 echo 'running tests...'
 
 ulimit -s unlimited

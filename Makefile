@@ -31,15 +31,15 @@ ancient.cma: ancient.cmo ancient_c.o
 ancient.cmxa: ancient.cmx ancient_c.o
 	ocamlmklib -o ancient -Lmmalloc -lmmalloc $^
 
-test_ancient_dict_write.opt: ancient.cmxa test_ancient_dict_write.cmx
+test_ancient_dict_write.opt: ancient.cmxa test_ancient_dict.cmx test_ancient_dict_write.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
 
-test_ancient_dict_verify.opt: ancient.cmxa test_ancient_dict_verify.cmx
+test_ancient_dict_verify.opt: ancient.cmxa test_ancient_dict.cmx test_ancient_dict_verify.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
 
-test_ancient_dict_read.opt: ancient.cmxa test_ancient_dict_read.cmx
+test_ancient_dict_read.opt: ancient.cmxa test_ancient_dict.cmx test_ancient_dict_read.cmx
 	LIBRARY_PATH=.:$$LIBRARY_PATH \
 	ocamlfind ocamlopt $(OCAMLOPTFLAGS) $(OCAMLOPTPACKAGES) $(OCAMLOPTLIBS) -o $@ $^
 
